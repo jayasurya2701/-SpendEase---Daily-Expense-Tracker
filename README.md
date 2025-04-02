@@ -55,4 +55,3 @@ Built with **Streamlit and Pandas**, SpendEase offers **real-time budget trackin
 
 ---
 
-💡 **Track, Save, Succeed!** 💰
