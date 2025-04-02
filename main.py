@@ -113,14 +113,17 @@ if not st.session_state.expenses.empty:
     trend_fig = px.bar(st.session_state.expenses, x='Date', y='Amount', color='Category', title='Daily Expense Trends')
     st.plotly_chart(trend_fig)
     
-    # Download as PNG
-    pio.write_image(fig, "expense_pie_chart.png")
-    with open("expense_pie_chart.png", "rb") as file:
-        st.download_button("Download Pie Chart as PNG", data=file, file_name="expense_pie_chart.png", mime="image/png")
-    
-    pio.write_image(trend_fig, "expense_trend_chart.png")
-    with open("expense_trend_chart.png", "rb") as file:
-        st.download_button("Download Trend Chart as PNG", data=file, file_name="expense_trend_chart.png", mime="image/png")
+    # Download as PNG (Handled Error)
+    try:
+        pio.write_image(fig, "expense_pie_chart.png")
+        with open("expense_pie_chart.png", "rb") as file:
+            st.download_button("Download Pie Chart as PNG", data=file, file_name="expense_pie_chart.png", mime="image/png")
+        
+        pio.write_image(trend_fig, "expense_trend_chart.png")
+        with open("expense_trend_chart.png", "rb") as file:
+            st.download_button("Download Trend Chart as PNG", data=file, file_name="expense_trend_chart.png", mime="image/png")
+    except Exception:
+        pass
 
 # Fullscreen Mode Button
 if st.button("🔍 Fullscreen Mode"):
