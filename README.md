@@ -51,7 +51,7 @@ Built with **Streamlit and Pandas**, SpendEase offers **real-time budget trackin
 
 ## 🔗 **Try the Live App**  
 
-🚀 **Live Demo on Streamlit**: [SpendEase](https://spendease.streamlit.app/) *(Add deployment link here)*  
+🚀 **Live Demo on Streamlit**: [SpendEase](https://spendease-dailyexpensetracker.streamlit.app/) 
 
 ---
 
