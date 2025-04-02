@@ -1,1 +1,1 @@
-# -SpendEase---Daily-Expense-Tracker
+# SpendEase-Daily Expense Tracker
