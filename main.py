@@ -25,7 +25,12 @@ st.markdown(
 )
 
 # 📌 Show Project Title Before Authentication
-st.markdown("<p class='centered-text'>💸 SpendEase - Daily Expense Tracker - Track, Save, Succeed!</p>", unsafe_allow_html=True)
+st.markdown("""
+    <h1 style='text-align: center; color: #1E88E5;'>💸 SpendEase - Daily Expense Tracker</h1>
+    <h3 style='text-align: center; color: #555;'>Track, Save, Succeed!</h3>
+    <hr>
+""", unsafe_allow_html=True)
+
 
 # Connect to SQLite Database
 conn = sqlite3.connect("spendease.db", check_same_thread=False)
