@@ -30,11 +30,13 @@ st.markdown(
 # 📌 Show Project Title Before Authentication
 st.markdown("""
     <div style="display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center;">
-        <h1 style='color: #1E88E5;'>💸 SpendEase - Daily Expense Tracker</h1>
-        <h3 style='color: #555;'>Track, Save, Succeed!</h3>
+        <img src="https://cdn-icons-png.flaticon.com/512/6333/6333310.png" width="80">
+        <h1 style='color: #1E88E5; font-size: 36px; font-weight: bold;'>SpendEase - Daily Expense Tracker</h1>
+        <h3 style='color: #555; font-size: 22px;'>Track, Save, Succeed!</h3>
     </div>
     <hr>
 """, unsafe_allow_html=True)
+
 
 # Connect to SQLite Database
 conn = sqlite3.connect("spendease.db", check_same_thread=False)
