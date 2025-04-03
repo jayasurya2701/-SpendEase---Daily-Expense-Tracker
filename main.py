@@ -51,8 +51,25 @@ init_db()
 def load_auth_config():
     config_path = "config.yaml"
     if not os.path.exists(config_path):
-        raise FileNotFoundError(f"Error: '{config_path}' not found. Please ensure the file exists.")
-    
+        default_config = {
+            "credentials": {
+                "usernames": {
+                    "admin": {
+                        "email": "admin@example.com",
+                        "name": "Admin",
+                        "password": "adminpassword"
+                    }
+                }
+            },
+            "cookie": {
+                "name": "spendease_cookie",
+                "key": "random_key",
+                "expiry_days": 30
+            }
+        }
+        with open(config_path, 'w') as file:
+            yaml.dump(default_config, file)
+
     with open(config_path) as file:
         return yaml.load(file, Loader=SafeLoader)
 
@@ -61,6 +78,7 @@ try:
 except FileNotFoundError as e:
     st.error(str(e))
     st.stop()
+
 # Authentication
 authenticator = stauth.Authenticate(
     auth_config['credentials'],
@@ -139,8 +157,8 @@ if remaining_budget < 0:
     
     # Send Email Alert
     def send_email_alert(user_email, budget, total_spent):
-        sender_email = "your-email@gmail.com"
-        sender_password = "your-email-password"
+        sender_email = os.getenv("EMAIL_SENDER")
+        sender_password = os.getenv("EMAIL_PASSWORD")
         receiver_email = user_email
         subject = "Budget Alert - SpendEase"
         body = f"Hello,\n\nYou have exceeded your budget of ₹{budget}. Your current total expenditure is ₹{total_spent}.\n\nPlease review your expenses.\n\nBest,\nSpendEase Team"
