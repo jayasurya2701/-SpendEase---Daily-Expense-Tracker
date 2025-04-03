@@ -7,24 +7,26 @@ import plotly.express as px
 # Set page configuration
 st.set_page_config(page_title="SpendEase - Daily Expense Tracker", layout="wide")
 
-# Custom CSS for styling
+# Custom CSS for proper alignment
 st.markdown(
     """
     <style>
-    .block-container { padding-top: 0rem !important; }
+    .block-container { 
+        padding-top: 0rem !important; 
+    }
     .centered-container {
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: flex-end;  /* Push content to the bottom */
         align-items: center;
         text-align: center;
-        width: 100%;
+        min-height: 80vh;  /* Adjusts height to push towards the bottom */
+        padding-bottom: 50px;  /* Space from bottom */
     }
     .centered-text {
         font-size: 36px;
         font-weight: bold;
         color: #1E88E5;
-        margin-top: 20px;
         padding: 10px;
         background-color: #f8f9fa;
         border-radius: 10px;
@@ -43,7 +45,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Display the project title centered
+# 📌 Display Title Closer to Bottom of Page
 st.markdown("""
     <div class="centered-container">
         <h1 class="centered-text">SpendEase - Daily Expense Tracker</h1>
