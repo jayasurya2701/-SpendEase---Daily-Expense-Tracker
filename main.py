@@ -18,6 +18,9 @@ st.markdown(
         font-weight: bold;
         color: #1E88E5;
         margin-top: 20px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 10px;
     }
     </style>
     """,
