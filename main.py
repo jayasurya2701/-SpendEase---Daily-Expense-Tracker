@@ -12,9 +12,16 @@ st.markdown(
     """
     <style>
     .block-container { padding-top: 0rem !important; }
-    .centered-text {
+    .centered-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
         text-align: center;
-        font-size: 28px;
+        width: 100%;
+    }
+    .centered-text {
+        font-size: 36px;
         font-weight: bold;
         color: #1E88E5;
         margin-top: 20px;
@@ -22,20 +29,28 @@ st.markdown(
         background-color: #f8f9fa;
         border-radius: 10px;
     }
+    .subtitle {
+        font-size: 22px;
+        color: #555;
+        margin-top: -10px;
+    }
+    hr {
+        width: 80%;
+        margin: auto;
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# 📌 Show Project Title Before Authentication
+# Display the project title centered
 st.markdown("""
-    <div style="display: flex; justify-content: center; align-items: center; flex-direction: column; text-align: center;">
-        <h1 style='color: #1E88E5; font-size: 36px; font-weight: bold;'>SpendEase - Daily Expense Tracker</h1>
-        <h3 style='color: #555; font-size: 22px;'>Track, Save, Succeed!</h3>
+    <div class="centered-container">
+        <h1 class="centered-text">SpendEase - Daily Expense Tracker</h1>
+        <h3 class="subtitle">Track, Save, Succeed!</h3>
     </div>
     <hr>
 """, unsafe_allow_html=True)
-
 
 # Connect to SQLite Database
 conn = sqlite3.connect("spendease.db", check_same_thread=False)
