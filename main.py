@@ -14,7 +14,7 @@ st.markdown(
     .block-container { padding-top: 0rem !important; }
     .centered-text {
         text-align: center;
-        font-size: 60px;
+        font-size: 30px;
         font-weight: bold;
         color: #1E88E5;
         margin-top: -80px;
