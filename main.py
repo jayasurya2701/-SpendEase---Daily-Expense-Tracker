@@ -6,6 +6,30 @@ import plotly.io as pio
 
 st.set_page_config(page_title="SpendEase - Daily Expense Tracker", page_icon="💸")
 
+# Authentication System
+if 'user' not in st.session_state:
+    st.session_state.user = None
+
+def login():
+    username = st.text_input("Enter Username", key="username")
+    password = st.text_input("Enter Password", type="password", key="password")
+    if st.button("Login"):
+        if username and password:  # Simple check, replace with database auth
+            st.session_state.user = username
+            st.success(f"Welcome, {username}!")
+            st.rerun()
+        else:
+            st.error("Invalid credentials")
+
+def logout():
+    st.session_state.user = None
+    st.rerun()
+
+if not st.session_state.user:
+    st.title("🔒 SpendEase - Secure Expense Tracker")
+    login()
+    st.stop()
+
 # Tagline
 st.sidebar.markdown("### 💰 SpendEase - Track, Save, Succeed!")
 
@@ -113,17 +137,14 @@ if not st.session_state.expenses.empty:
     trend_fig = px.bar(st.session_state.expenses, x='Date', y='Amount', color='Category', title='Daily Expense Trends')
     st.plotly_chart(trend_fig)
     
-    # Download as PNG (Handled Error)
-    try:
-        pio.write_image(fig, "expense_pie_chart.png")
-        with open("expense_pie_chart.png", "rb") as file:
-            st.download_button("Download Pie Chart as PNG", data=file, file_name="expense_pie_chart.png", mime="image/png")
-        
-        pio.write_image(trend_fig, "expense_trend_chart.png")
-        with open("expense_trend_chart.png", "rb") as file:
-            st.download_button("Download Trend Chart as PNG", data=file, file_name="expense_trend_chart.png", mime="image/png")
-    except Exception:
-        pass
+    # Download as PNG
+    pio.write_image(fig, "expense_pie_chart.png")
+    with open("expense_pie_chart.png", "rb") as file:
+        st.download_button("Download Pie Chart as PNG", data=file, file_name="expense_pie_chart.png", mime="image/png")
+    
+    pio.write_image(trend_fig, "expense_trend_chart.png")
+    with open("expense_trend_chart.png", "rb") as file:
+        st.download_button("Download Trend Chart as PNG", data=file, file_name="expense_trend_chart.png", mime="image/png")
 
 # Fullscreen Mode Button
 if st.button("🔍 Fullscreen Mode"):
