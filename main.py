@@ -7,14 +7,14 @@ import plotly.express as px
 # Set page configuration
 st.set_page_config(page_title="SpendEase - Daily Expense Tracker", layout="wide")
 
-# Custom CSS for styling
+# Custom CSS for better visibility
 st.markdown(
     """
     <style>
     .block-container { padding-top: 0rem !important; }
     .centered-text {
         text-align: center;
-        font-size: 28px;
+        font-size: 32px;
         font-weight: bold;
         color: #1E88E5;
         margin-top: 20px;
@@ -27,13 +27,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 📌 Show Project Title Before Authentication
+# Project Title - More Visible
 st.markdown("""
-    <h1 style='text-align: center; color: #1E88E5;'>💸 SpendEase - Daily Expense Tracker</h1>
-    <h3 style='text-align: center; color: #555;'>Track, Save, Succeed!</h3>
-    <hr>
+<p class='centered-text'>💸 SpendEase - Daily Expense Tracker</p>
 """, unsafe_allow_html=True)
-
 
 # Connect to SQLite Database
 conn = sqlite3.connect("spendease.db", check_same_thread=False)
