@@ -133,14 +133,26 @@ st.metric(label="Total Spent Today", value=f"₹{today_expenses['Amount'].sum():
 # Budget Setting
 st.sidebar.subheader("Set Monthly Budget")
 current_budget = 0.0
+
 if st.session_state.user_id:
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS budgets (
+                user_id INTEGER PRIMARY KEY,
+                monthly_budget REAL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        conn.commit()
+
+        # Check if budget entry exists
         cursor.execute("SELECT monthly_budget FROM budgets WHERE user_id=?", (st.session_state.user_id,))
         budget_result = cursor.fetchone()
         current_budget = budget_result[0] if budget_result else 0.0
 
 monthly_budget = st.sidebar.number_input("Enter Monthly Budget", min_value=0.0, format="%.2f", value=current_budget)
+
 if st.sidebar.button("Save Budget") and st.session_state.user_id:
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
