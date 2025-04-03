@@ -7,48 +7,45 @@ import plotly.express as px
 # Set page configuration
 st.set_page_config(page_title="SpendEase - Daily Expense Tracker", layout="wide")
 
-# Custom CSS for proper alignment
+# Custom CSS for proper vertical and horizontal centering
 st.markdown(
     """
     <style>
-    .block-container { 
-        padding-top: 0rem !important; 
-    }
-    .centered-container {
+    /* Full page container to align content in the middle */
+    .full-page-container {
         display: flex;
         flex-direction: column;
-        justify-content: flex-end;  /* Push content to the bottom */
-        align-items: center;
+        justify-content: center; /* Centers vertically */
+        align-items: center; /* Centers horizontally */
+        height: 60vh; /* Adjust height to move title more towards middle */
         text-align: center;
-        min-height: 80vh;  /* Adjusts height to push towards the bottom */
-        padding-bottom: 50px;  /* Space from bottom */
     }
-    .centered-text {
-        font-size: 36px;
+    
+    .title {
+        font-size: 42px;
         font-weight: bold;
         color: #1E88E5;
-        padding: 10px;
-        background-color: #f8f9fa;
-        border-radius: 10px;
+        margin-bottom: 10px;
     }
+
     .subtitle {
-        font-size: 22px;
+        font-size: 24px;
         color: #555;
-        margin-top: -10px;
     }
+
     hr {
         width: 80%;
-        margin: auto;
+        margin: 20px auto;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# 📌 Display Title Closer to Bottom of Page
+# Display the title in the middle of the page
 st.markdown("""
-    <div class="centered-container">
-        <h1 class="centered-text">SpendEase - Daily Expense Tracker</h1>
+    <div class="full-page-container">
+        <h1 class="title">SpendEase - Daily Expense Tracker</h1>
         <h3 class="subtitle">Track, Save, Succeed!</h3>
     </div>
     <hr>
