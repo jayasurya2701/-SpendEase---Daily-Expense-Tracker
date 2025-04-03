@@ -7,14 +7,14 @@ import plotly.express as px
 # Set page configuration
 st.set_page_config(page_title="SpendEase - Daily Expense Tracker", layout="wide")
 
-# Custom CSS for better visibility
+# Custom CSS for styling
 st.markdown(
     """
     <style>
     .block-container { padding-top: 0rem !important; }
     .centered-text {
         text-align: center;
-        font-size: 32px;
+        font-size: 28px;
         font-weight: bold;
         color: #1E88E5;
         margin-top: 20px;
@@ -27,9 +27,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Project Title - More Visible
+# 📌 Show Project Title Before Authentication
 st.markdown("""
-<p class='centered-text'>💸 SpendEase - Daily Expense Tracker</p>
+    <h1 style='text-align: center; color: #1E88E5;'>💸 SpendEase - Daily Expense Tracker</h1>
+    <h3 style='text-align: center; color: #555;'>Track, Save, Succeed!</h3>
+    <hr>
 """, unsafe_allow_html=True)
 
 # Connect to SQLite Database
@@ -103,6 +105,13 @@ if "user_id" not in st.session_state:
 
     st.stop()
 
+# 📌 Show Project Title Again in the Middle
+st.markdown("""
+    <h1 style='text-align: center; color: #1E88E5;'>💸 SpendEase - Daily Expense Tracker</h1>
+    <h3 style='text-align: center; color: #555;'>Track, Save, Succeed!</h3>
+    <hr>
+""", unsafe_allow_html=True)
+
 # Get logged-in user ID
 user_id = st.session_state.user_id
 
@@ -136,47 +145,6 @@ today_expenses = expenses[expenses['date'].dt.date == today]
 st.subheader("📊 Today's Total Expense")
 st.metric(label="Total Spent Today", value=f"₹{today_expenses['amount'].sum():.2f}")
 
-# Weekly & Monthly Summary
-st.sidebar.header("📈 Expense Summary")
-weekly_expenses = expenses[expenses["date"] >= pd.to_datetime(today - datetime.timedelta(days=7))]
-monthly_expenses = expenses[expenses["date"].dt.month == today.month]
-
-st.sidebar.subheader("📆 Weekly Total")
-st.sidebar.write(f"₹{weekly_expenses['amount'].sum():.2f}")
-
-st.sidebar.subheader("📅 Monthly Total")
-st.sidebar.write(f"₹{monthly_expenses['amount'].sum():.2f}")
-
-# Budget Setting & Alerts
-st.sidebar.subheader("💰 Set Monthly Budget")
-cursor.execute("SELECT budget FROM budgets WHERE user_id=?", (user_id,))
-budget_data = cursor.fetchone()
-current_budget = budget_data[0] if budget_data else 0.0
-new_budget = st.sidebar.number_input("Enter Budget", min_value=0.0, format="%.2f", value=current_budget)
-
-if st.sidebar.button("Save Budget"):
-    cursor.execute("REPLACE INTO budgets (user_id, budget) VALUES (?, ?)", (user_id, new_budget))
-    conn.commit()
-    st.sidebar.success("✅ Budget Updated!")
-    st.rerun()
-
-remaining_budget = new_budget - monthly_expenses['amount'].sum()
-st.sidebar.subheader("📉 Remaining Budget")
-st.sidebar.write(f"₹{remaining_budget:.2f}")
-
-if remaining_budget < 0:
-    st.sidebar.warning("⚠️ You have exceeded your budget!")
-
-# Expense Deletion
-st.subheader("🗑️ Manage Expenses")
-if not expenses.empty:
-    expense_to_delete = st.selectbox("Select an expense to delete", expenses["id"])
-    if st.button("Delete Selected Expense"):
-        cursor.execute("DELETE FROM expenses WHERE id=? AND user_id=?", (expense_to_delete, user_id))
-        conn.commit()
-        st.success("✅ Expense Deleted!")
-        st.rerun()
-
 # Expense Visualization
 st.subheader("📊 Expense Analytics")
 if not expenses.empty:
@@ -186,22 +154,6 @@ if not expenses.empty:
     
     trend_fig = px.bar(expenses, x='date', y='amount', color='category', title='Daily Expense Trends')
     st.plotly_chart(trend_fig)
-
-# Expense Download Feature
-st.subheader("📥 Download Expense Report")
-if not expenses.empty:
-    # Convert DataFrame to CSV
-    csv = expenses.to_csv(index=False).encode('utf-8')
-
-    # Provide download button
-    st.download_button(
-        label="📥 Download as CSV",
-        data=csv,
-        file_name=f"SpendEase_Expenses_{today}.csv",
-        mime="text/csv"
-    )
-else:
-    st.info("No expenses to download.")
 
 # Logout Button
 st.sidebar.button("🔒 Logout", on_click=lambda: st.session_state.clear() or st.rerun())
