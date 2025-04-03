@@ -7,7 +7,7 @@ import plotly.express as px
 # Set page configuration
 st.set_page_config(page_title="SpendEase - Daily Expense Tracker", layout="wide")
 
-# Custom CSS to remove extra padding and center the header
+# Custom CSS for styling
 st.markdown(
     """
     <style>
@@ -24,7 +24,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Centered Header
+# 📌 Show Project Title Before Authentication
 st.markdown("<p class='centered-text'>💸 SpendEase - Daily Expense Tracker - Track, Save, Succeed!</p>", unsafe_allow_html=True)
 
 # Connect to SQLite Database
@@ -181,6 +181,22 @@ if not expenses.empty:
     
     trend_fig = px.bar(expenses, x='date', y='amount', color='category', title='Daily Expense Trends')
     st.plotly_chart(trend_fig)
+
+# Expense Download Feature
+st.subheader("📥 Download Expense Report")
+if not expenses.empty:
+    # Convert DataFrame to CSV
+    csv = expenses.to_csv(index=False).encode('utf-8')
+
+    # Provide download button
+    st.download_button(
+        label="📥 Download as CSV",
+        data=csv,
+        file_name=f"SpendEase_Expenses_{today}.csv",
+        mime="text/csv"
+    )
+else:
+    st.info("No expenses to download.")
 
 # Logout Button
 st.sidebar.button("🔒 Logout", on_click=lambda: st.session_state.clear() or st.rerun())
