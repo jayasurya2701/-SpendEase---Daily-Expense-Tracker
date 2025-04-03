@@ -3,7 +3,6 @@ import pandas as pd
 import sqlite3
 import datetime
 import plotly.express as px
-import plotly.io as pio
 import hashlib
 
 DB_FILE = "expenses.db"
@@ -14,34 +13,33 @@ def hash_password(password):
 
 # Initialize Database
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS expenses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            date TEXT,
-            category TEXT,
-            amount REAL,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS budgets (
-            user_id INTEGER PRIMARY KEY,
-            monthly_budget REAL,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    """)
-    conn.commit()
-    conn.close()
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE,
+                password TEXT
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS expenses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                date TEXT,
+                category TEXT,
+                amount REAL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS budgets (
+                user_id INTEGER PRIMARY KEY,
+                monthly_budget REAL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        conn.commit()
 
 init_db()
 
@@ -53,25 +51,24 @@ def signup():
     username = st.text_input("Create Username")
     password = st.text_input("Create Password", type="password")
     if st.button("Sign Up"):
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        try:
-            cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hash_password(password)))
-            conn.commit()
-            st.success("Account created! Please log in.")
-        except sqlite3.IntegrityError:
-            st.error("Username already exists. Choose another one.")
-        conn.close()
+        with sqlite3.connect(DB_FILE) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hash_password(password)))
+                conn.commit()
+                st.success("Account created! Please log in.")
+            except sqlite3.IntegrityError:
+                st.error("Username already exists. Choose another one.")
 
 def login():
     username = st.text_input("Enter Username")
     password = st.text_input("Enter Password", type="password")
     if st.button("Login"):
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, password FROM users WHERE username=?", (username,))
-        user = cursor.fetchone()
-        conn.close()
+        with sqlite3.connect(DB_FILE) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, password FROM users WHERE username=?", (username,))
+            user = cursor.fetchone()
+        
         if user and hash_password(password) == user[1]:
             st.session_state.user_id = user[0]
             st.success(f"Welcome, {username}!")
@@ -104,48 +101,51 @@ if category == "Others":
 amount = st.number_input("Amount Spent", min_value=0.0, format="%.2f")
 date = st.date_input("Date", datetime.date.today())
 
-if st.button("Add Expense"):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO expenses (user_id, date, category, amount) VALUES (?, ?, ?, ?)",
-                   (st.session_state.user_id, date, category, amount))
-    conn.commit()
-    conn.close()
+if st.button("Add Expense") and st.session_state.user_id:
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO expenses (user_id, date, category, amount) VALUES (?, ?, ?, ?)",
+                       (st.session_state.user_id, date, category, amount))
+        conn.commit()
     st.success("Expense Added!")
     st.rerun()
 
 # Fetch Expenses for Current User
-conn = sqlite3.connect(DB_FILE)
-cursor = conn.cursor()
-cursor.execute("SELECT date, category, amount FROM expenses WHERE user_id=?", (st.session_state.user_id,))
-expenses = cursor.fetchall()
-conn.close()
-
-# Convert Expenses to DataFrame
-expenses_df = pd.DataFrame(expenses, columns=["Date", "Category", "Amount"])
-expenses_df["Date"] = pd.to_datetime(expenses_df["Date"])
+expenses_df = pd.DataFrame()
+if st.session_state.user_id:
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT date, category, amount FROM expenses WHERE user_id=?", (st.session_state.user_id,))
+        expenses = cursor.fetchall()
+    
+    if expenses:
+        expenses_df = pd.DataFrame(expenses, columns=["Date", "Category", "Amount"])
+        expenses_df["Date"] = pd.to_datetime(expenses_df["Date"])
 
 today = datetime.date.today()
-today_expenses = expenses_df[expenses_df["Date"].dt.date == today]
-st.metric(label="Total Spent Today", value=f"₹{today_expenses['Amount'].sum():.2f}")
+today_expenses = expenses_df[expenses_df["Date"].dt.date == today] if not expenses_df.empty else pd.DataFrame()
+st.metric(label="Total Spent Today", value=f"₹{today_expenses['Amount'].sum():.2f}" if not today_expenses.empty else "₹0.00")
 
 # Budget Setting
 st.sidebar.subheader("Set Monthly Budget")
-conn = sqlite3.connect(DB_FILE)
-cursor = conn.cursor()
-cursor.execute("SELECT monthly_budget FROM budgets WHERE user_id=?", (st.session_state.user_id,))
-budget_result = cursor.fetchone()
-current_budget = budget_result[0] if budget_result else 0.0
+current_budget = 0.0
+if st.session_state.user_id:
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT monthly_budget FROM budgets WHERE user_id=?", (st.session_state.user_id,))
+        budget_result = cursor.fetchone()
+        current_budget = budget_result[0] if budget_result else 0.0
 
 monthly_budget = st.sidebar.number_input("Enter Monthly Budget", min_value=0.0, format="%.2f", value=current_budget)
-if st.sidebar.button("Save Budget"):
-    if budget_result:
-        cursor.execute("UPDATE budgets SET monthly_budget=? WHERE user_id=?", (monthly_budget, st.session_state.user_id))
-    else:
-        cursor.execute("INSERT INTO budgets (user_id, monthly_budget) VALUES (?, ?)", (st.session_state.user_id, monthly_budget))
-    conn.commit()
+if st.sidebar.button("Save Budget") and st.session_state.user_id:
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        if budget_result:
+            cursor.execute("UPDATE budgets SET monthly_budget=? WHERE user_id=?", (monthly_budget, st.session_state.user_id))
+        else:
+            cursor.execute("INSERT INTO budgets (user_id, monthly_budget) VALUES (?, ?)", (st.session_state.user_id, monthly_budget))
+        conn.commit()
     st.success("Budget Updated!")
-conn.close()
 
 # Expense Visualization
 if not expenses_df.empty:
