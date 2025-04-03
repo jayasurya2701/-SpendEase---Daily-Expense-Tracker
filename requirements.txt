@@ -2,7 +2,6 @@ streamlit
 streamlit-authenticator
 pandas
 plotly
-sqlite3
 smtplib
 email-validator
 pyjwt
