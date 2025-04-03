@@ -57,51 +57,43 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS budgets (
 
 conn.commit()
 
-# User Authentication Functions
-def authenticate(username, password):
-    cursor.execute("SELECT id FROM users WHERE username=? AND password=?", (username, password))
-    user = cursor.fetchone()
-    return user[0] if user else None
-
-def register_user(username, password):
-    try:
-        cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
-
-# Sidebar Authentication
+# 🛑 User Authentication
 if "user_id" not in st.session_state:
     st.sidebar.header("🔑 Login / Sign Up")
     auth_option = st.sidebar.radio("Select", ["Login", "Sign Up"])
     username = st.sidebar.text_input("Username")
     password = st.sidebar.text_input("Password", type="password")
 
+    # Registration
     if auth_option == "Sign Up":
         if st.sidebar.button("Register"):
-            if register_user(username, password):
+            try:
+                cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+                conn.commit()
                 st.sidebar.success("✅ Account Created! Please Login.")
-            else:
+            except sqlite3.IntegrityError:
                 st.sidebar.error("❌ Username already exists. Try another.")
 
+    # Login
     if auth_option == "Login":
         if st.sidebar.button("Login"):
-            user_id = authenticate(username, password)
-            if user_id:
-                st.session_state.user_id = user_id
+            cursor.execute("SELECT id FROM users WHERE username=? AND password=?", (username, password))
+            user = cursor.fetchone()
+            if user:
+                st.session_state.user_id = user[0]
                 st.session_state.username = username
                 st.sidebar.success(f"✅ Welcome {username}!")
                 st.rerun()
             else:
                 st.sidebar.error("❌ Invalid Credentials!")
 
+    # Stop execution if user is not authenticated
     st.stop()
 
 # Get logged-in user ID
 user_id = st.session_state.user_id
 
-# Expense Entry Section
+# 📥 Expense Entry Section
 st.subheader("📌 Enter Your Expenses")
 category = st.selectbox("Expense Category", ["Food", "Transport", "Shopping", "Bills", "Others"])
 if category == "Others":
@@ -121,17 +113,17 @@ if st.button("Add Expense"):
     st.success("✅ Expense Added!")
     st.rerun()
 
-# Load Expenses for Logged-in User
+# 📊 Load Expenses for Logged-in User
 expenses = pd.read_sql("SELECT * FROM expenses WHERE user_id=?", conn, params=(user_id,))
 expenses["date"] = pd.to_datetime(expenses["date"], errors='coerce')
 
-# Display Daily Total
+# 📈 Display Daily Total
 today = datetime.date.today()
 today_expenses = expenses[expenses['date'].dt.date == today]
 st.subheader("📊 Today's Total Expense")
 st.metric(label="Total Spent Today", value=f"₹{today_expenses['amount'].sum():.2f}")
 
-# Weekly & Monthly Summary
+# 📅 Weekly & Monthly Summary
 st.sidebar.header("📈 Expense Summary")
 weekly_expenses = expenses[expenses["date"] >= pd.to_datetime(today - datetime.timedelta(days=7))]
 monthly_expenses = expenses[expenses["date"].dt.month == today.month]
@@ -142,7 +134,7 @@ st.sidebar.write(f"₹{weekly_expenses['amount'].sum():.2f}")
 st.sidebar.subheader("📅 Monthly Total")
 st.sidebar.write(f"₹{monthly_expenses['amount'].sum():.2f}")
 
-# Budget Setting & Alerts
+# 💰 Budget Setting & Alerts
 st.sidebar.subheader("💰 Set Monthly Budget")
 cursor.execute("SELECT budget FROM budgets WHERE user_id=?", (user_id,))
 budget_data = cursor.fetchone()
@@ -162,7 +154,7 @@ st.sidebar.write(f"₹{remaining_budget:.2f}")
 if remaining_budget < 0:
     st.sidebar.warning("⚠️ You have exceeded your budget!")
 
-# Expense Deletion
+# 🗑️ Expense Deletion
 st.subheader("🗑️ Manage Expenses")
 if not expenses.empty:
     expense_to_delete = st.selectbox("Select an expense to delete", expenses["id"])
@@ -172,7 +164,7 @@ if not expenses.empty:
         st.success("✅ Expense Deleted!")
         st.rerun()
 
-# Expense Visualization
+# 📊 Expense Visualization
 st.subheader("📊 Expense Analytics")
 if not expenses.empty:
     category_summary = expenses.groupby('category')['amount'].sum().reset_index()
@@ -182,13 +174,10 @@ if not expenses.empty:
     trend_fig = px.bar(expenses, x='date', y='amount', color='category', title='Daily Expense Trends')
     st.plotly_chart(trend_fig)
 
-# Expense Download Feature
+# 📥 Download Expense CSV Feature
 st.subheader("📥 Download Expense Report")
 if not expenses.empty:
-    # Convert DataFrame to CSV
     csv = expenses.to_csv(index=False).encode('utf-8')
-
-    # Provide download button
     st.download_button(
         label="📥 Download as CSV",
         data=csv,
@@ -198,5 +187,5 @@ if not expenses.empty:
 else:
     st.info("No expenses to download.")
 
-# Logout Button
+# 🔒 Logout Button
 st.sidebar.button("🔒 Logout", on_click=lambda: st.session_state.clear() or st.rerun())
