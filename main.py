@@ -11,7 +11,7 @@ st.markdown(
     <style>
     .centered-text {
         text-align: center;
-        font-size: 24px;
+        font-size: 36px;
         font-weight: bold;
         color: #1E88E5;
     }
