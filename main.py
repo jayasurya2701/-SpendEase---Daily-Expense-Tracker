@@ -113,15 +113,19 @@ if st.button("Add Expense") and st.session_state.user_id:
 # Fetch Expenses for Current User
 expenses_df = pd.DataFrame()
 if st.session_state.user_id:
-    with sqlite3.connect(DB_FILE) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT date, category, amount FROM expenses WHERE user_id=?", (st.session_state.user_id,))
-        expenses = cursor.fetchall()
-    
-    if expenses:
-        expenses_df = pd.DataFrame(expenses, columns=["Date", "Category", "Amount"])
-        expenses_df["Date"] = pd.to_datetime(expenses_df["Date"])
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT date, category, amount FROM expenses WHERE user_id=?", (st.session_state.user_id,))
+            expenses = cursor.fetchall()
+        
+        if expenses:
+            expenses_df = pd.DataFrame(expenses, columns=["Date", "Category", "Amount"])
+            expenses_df["Date"] = pd.to_datetime(expenses_df["Date"])
+    except sqlite3.OperationalError as e:
+        st.error(f"Database error: {str(e)}")
 
+# Display Today's Expenses
 today = datetime.date.today()
 today_expenses = expenses_df[expenses_df["Date"].dt.date == today] if not expenses_df.empty else pd.DataFrame()
 st.metric(label="Total Spent Today", value=f"₹{today_expenses['Amount'].sum():.2f}" if not today_expenses.empty else "₹0.00")
