@@ -2,169 +2,160 @@ import streamlit as st
 import pandas as pd
 import datetime
 import plotly.express as px
-import plotly.io as pio
+import sqlite3
+import smtplib
+import streamlit_authenticator as stauth
+import yaml
+from yaml.loader import SafeLoader
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-st.set_page_config(page_title="SpendEase - Daily Expense Tracker", page_icon="💸")
+st.set_page_config(page_title="SpendEase - Secure Expense Tracker", page_icon="💸")
 
-# Authentication System
-if 'user' not in st.session_state:
-    st.session_state.user = None
+# Database Setup
+def init_db():
+    conn = sqlite3.connect("expenses.db")
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            email TEXT UNIQUE
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user TEXT,
+            date TEXT,
+            time TEXT,
+            period TEXT,
+            category TEXT,
+            amount REAL
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS budgets (
+            user TEXT PRIMARY KEY,
+            budget REAL
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-def login():
-    username = st.text_input("Enter Username", key="username")
-    password = st.text_input("Enter Password", type="password", key="password")
-    if st.button("Login"):
-        if username and password:  # Simple check, replace with database auth
-            st.session_state.user = username
-            st.success(f"Welcome, {username}!")
-            st.rerun()
-        else:
-            st.error("Invalid credentials")
+init_db()
 
-def logout():
-    st.session_state.user = None
-    st.rerun()
+# Load authentication config
+def load_auth_config():
+    with open("config.yaml") as file:
+        return yaml.load(file, Loader=SafeLoader)
 
-if not st.session_state.user:
-    st.title("🔒 SpendEase - Secure Expense Tracker")
-    login()
+auth_config = load_auth_config()
+
+# Authentication
+authenticator = stauth.Authenticate(
+    auth_config['credentials'],
+    auth_config['cookie']['name'],
+    auth_config['cookie']['key'],
+    auth_config['cookie']['expiry_days'],
+)
+
+name, authentication_status, username = authenticator.login("Login", "main")
+
+if not authentication_status:
+    st.warning("Please log in to access SpendEase.")
     st.stop()
 
-# Tagline
-st.sidebar.markdown("### 💰 SpendEase - Track, Save, Succeed!")
+st.sidebar.write(f"Logged in as: {username}")
+authenticator.logout("Logout", "sidebar")
 
-# File to store expenses
-FILE_PATH = "expenses.csv"
-BUDGET_FILE = "budget.txt"
+# Connect to DB
+def get_db_connection():
+    return sqlite3.connect("expenses.db", check_same_thread=False)
 
-# Load existing expenses from file
-try:
-    expenses = pd.read_csv(FILE_PATH, parse_dates=['Date'], dayfirst=True)
-except FileNotFoundError:
-    expenses = pd.DataFrame(columns=['Date', 'Time', 'Period', 'Category', 'Amount'])
+conn = get_db_connection()
+cursor = conn.cursor()
 
-# Load or initialize the monthly budget
-try:
-    with open(BUDGET_FILE, "r") as f:
-        monthly_budget = float(f.read().strip())
-except (FileNotFoundError, ValueError):
-    monthly_budget = 0.0
+# Load user-specific budget
+def get_user_budget(user):
+    cursor.execute("SELECT budget FROM budgets WHERE user = ?", (user,))
+    result = cursor.fetchone()
+    return result[0] if result else 0.0
 
-# Initialize session state
-if 'expenses' not in st.session_state:
-    st.session_state.expenses = expenses
-if 'monthly_budget' not in st.session_state:
-    st.session_state.monthly_budget = monthly_budget
+user_budget = get_user_budget(username)
+st.session_state.monthly_budget = user_budget
 
+# Expense Entry
 st.title("💸 SpendEase - Daily Expense Tracker")
-
-# Expense Entry Section
 st.subheader("Enter Your Expenses")
 category = st.selectbox("Expense Category", ["Food", "Transport", "Shopping", "Bills", "Others"])
 if category == "Others":
     category = st.text_input("Enter Custom Category")
 amount = st.number_input("Amount Spent", min_value=0.0, format="%.2f")
-date = st.date_input("Date", datetime.date.today())
-time = st.time_input("Time", datetime.datetime.now().time()).strftime("%I:%M %p")
-
-# Determine period of the day
-hour = datetime.datetime.strptime(time, "%I:%M %p").hour
-if 5 <= hour < 12:
-    period = "Morning"
-elif 12 <= hour < 17:
-    period = "Afternoon"
-elif 17 <= hour < 21:
-    period = "Evening"
-else:
-    period = "Night"
+date = st.date_input("Date", datetime.date.today()).strftime('%Y-%m-%d')
+time = st.time_input("Time", datetime.datetime.now().time()).strftime('%H:%M')
+period = "Morning" if 5 <= int(time.split(':')[0]) < 12 else "Afternoon" if int(time.split(':')[0]) < 17 else "Evening" if int(time.split(':')[0]) < 21 else "Night"
 
 if st.button("Add Expense"):
-    new_expense = pd.DataFrame([[date, time, period, category, amount]], columns=['Date', 'Time', 'Period', 'Category', 'Amount'])
-    st.session_state.expenses = pd.concat([st.session_state.expenses, new_expense], ignore_index=True)
-    st.session_state.expenses.to_csv(FILE_PATH, index=False)
+    cursor.execute("INSERT INTO expenses (user, date, time, period, category, amount) VALUES (?, ?, ?, ?, ?, ?)",
+                   (username, date, time, period, category, amount))
+    conn.commit()
     st.success("Expense Added!")
 
-# Convert 'Date' column to datetime format
-st.session_state.expenses['Date'] = pd.to_datetime(st.session_state.expenses['Date'], errors='coerce', format='%Y-%m-%d')
+# Load expenses
+def load_expenses(user):
+    cursor.execute("SELECT * FROM expenses WHERE user = ?", (user,))
+    return pd.DataFrame(cursor.fetchall(), columns=['ID', 'User', 'Date', 'Time', 'Period', 'Category', 'Amount'])
 
-# Display Daily Total
+expenses = load_expenses(username)
+
 st.subheader("Today's Total Expense")
-today = datetime.date.today()
-today_expenses = st.session_state.expenses[st.session_state.expenses['Date'].dt.date == today]
+today = datetime.date.today().strftime('%Y-%m-%d')
+today_expenses = expenses[expenses['Date'] == today]
 st.metric(label="Total Spent Today", value=f"₹{today_expenses['Amount'].sum():.2f}")
 
-# Sidebar for Weekly & Monthly Summary
-st.sidebar.header("Expense Summary")
-weekly_expenses = st.session_state.expenses[st.session_state.expenses['Date'] >= pd.to_datetime(today - datetime.timedelta(days=7))]
-monthly_expenses = st.session_state.expenses[st.session_state.expenses['Date'].dt.month == today.month]
-st.sidebar.subheader("Weekly Total")
-st.sidebar.write(f"₹{weekly_expenses['Amount'].sum():.2f}")
-st.sidebar.subheader("Monthly Total")
-st.sidebar.write(f"₹{monthly_expenses['Amount'].sum():.2f}")
-
-# View past month expenses
-st.sidebar.subheader("View Past Expenses")
-if not st.session_state.expenses.empty:
-    month_options = pd.date_range(start=st.session_state.expenses['Date'].min(), end=today, freq='MS').strftime('%B %Y').unique()
-else:
-    month_options = []
-
-month_selected = st.sidebar.selectbox("Select Month", month_options)
-if month_selected:
-    selected_month = datetime.datetime.strptime(month_selected, '%B %Y').month
-    past_expenses = st.session_state.expenses[st.session_state.expenses['Date'].dt.month == selected_month]
-    st.sidebar.write(f"Total for {month_selected}: ₹{past_expenses['Amount'].sum():.2f}")
-    st.sidebar.dataframe(past_expenses)
-
-# Expense Deletion Feature
-st.subheader("Manage Expenses")
-if not st.session_state.expenses.empty:
-    expense_to_delete = st.selectbox("Select an expense to delete", st.session_state.expenses.index)
-    if st.button("Delete Selected Expense"):
-        st.session_state.expenses = st.session_state.expenses.drop(index=expense_to_delete).reset_index(drop=True)
-        st.session_state.expenses.to_csv(FILE_PATH, index=False)
-        st.success("Expense Deleted!")
-
-# Visual Analytics
-st.subheader("Expense Analytics")
-if not st.session_state.expenses.empty:
-    category_summary = st.session_state.expenses.groupby('Category')['Amount'].sum().reset_index()
-    fig = px.pie(category_summary, names='Category', values='Amount', title='Expense Distribution')
-    st.plotly_chart(fig)
-    
-    # Bar Chart for Expense Trends
-    st.subheader("Expense Trends")
-    trend_fig = px.bar(st.session_state.expenses, x='Date', y='Amount', color='Category', title='Daily Expense Trends')
-    st.plotly_chart(trend_fig)
-    
-    # Download as PNG
-    pio.write_image(fig, "expense_pie_chart.png")
-    with open("expense_pie_chart.png", "rb") as file:
-        st.download_button("Download Pie Chart as PNG", data=file, file_name="expense_pie_chart.png", mime="image/png")
-    
-    pio.write_image(trend_fig, "expense_trend_chart.png")
-    with open("expense_trend_chart.png", "rb") as file:
-        st.download_button("Download Trend Chart as PNG", data=file, file_name="expense_trend_chart.png", mime="image/png")
-
-# Fullscreen Mode Button
-if st.button("🔍 Fullscreen Mode"):
-    st.write("Press F11 for fullscreen mode on your browser!")
-
-# Budget Setting Feature
+# Budget Setup
 st.sidebar.subheader("Set Budget Alert")
-st.session_state.monthly_budget = st.sidebar.number_input("Enter Monthly Budget", min_value=0.0, format="%.2f", value=st.session_state.monthly_budget)
+new_budget = st.sidebar.number_input("Enter Monthly Budget", min_value=0.0, format="%.2f", value=user_budget)
+if st.sidebar.button("Save Budget"):
+    cursor.execute("REPLACE INTO budgets (user, budget) VALUES (?, ?)", (username, new_budget))
+    conn.commit()
+    st.success("Budget Updated!")
 
-# Save the budget to file
-with open(BUDGET_FILE, "w") as f:
-    f.write(str(st.session_state.monthly_budget))
-
-remaining_budget = st.session_state.monthly_budget - monthly_expenses['Amount'].sum()
+remaining_budget = new_budget - expenses['Amount'].sum()
 st.sidebar.subheader("Remaining Budget")
 st.sidebar.write(f"₹{remaining_budget:.2f}")
-
 if remaining_budget < 0:
     st.sidebar.warning("⚠️ You have exceeded your budget!")
+    
+    # Send Email Alert
+    def send_email_alert(user_email, budget, total_spent):
+        sender_email = "your-email@gmail.com"
+        sender_password = "your-email-password"
+        receiver_email = user_email
+        subject = "Budget Alert - SpendEase"
+        body = f"Hello,\n\nYou have exceeded your budget of ₹{budget}. Your current total expenditure is ₹{total_spent}.\n\nPlease review your expenses.\n\nBest,\nSpendEase Team"
+        
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = receiver_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+        
+        try:
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, receiver_email, msg.as_string())
+            server.quit()
+            st.success("Budget alert email sent!")
+        except Exception as e:
+            st.error(f"Failed to send email: {e}")
 
-# Export Data
-st.subheader("Download Expense Report")
-st.download_button("Download CSV", data=st.session_state.expenses.to_csv(index=False), file_name="expense_report.csv", mime='text/csv')
+    cursor.execute("SELECT email FROM users WHERE username = ?", (username,))
+    user_email = cursor.fetchone()[0]
+    send_email_alert(user_email, new_budget, expenses['Amount'].sum())
+
+# Close DB Connection
+conn.close()
