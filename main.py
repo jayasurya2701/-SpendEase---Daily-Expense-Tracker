@@ -1,10 +1,71 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import sqlite3
+import hashlib
 import plotly.express as px
 import plotly.io as pio
 
 st.set_page_config(page_title="SpendEase - Daily Expense Tracker", page_icon="💸")
+# Database setup
+conn = sqlite3.connect("users.db", check_same_thread=False)
+cursor = conn.cursor()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT
+)
+""")
+conn.commit()
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def authenticate(username, password):
+    cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
+    result = cursor.fetchone()
+    if result and result[0] == hash_password(password):
+        return True
+    return False
+
+def register_user(username, password):
+    try:
+        cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hash_password(password)))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+# User authentication
+st.sidebar.title("🔑 User Authentication")
+menu = st.sidebar.radio("Select an option", ["Login", "Sign Up"])
+
+if menu == "Sign Up":
+    st.sidebar.subheader("Create a New Account")
+    new_user = st.sidebar.text_input("Username")
+    new_password = st.sidebar.text_input("Password", type="password")
+    if st.sidebar.button("Register"):
+        if register_user(new_user, new_password):
+            st.sidebar.success("Account created successfully! Please log in.")
+        else:
+            st.sidebar.error("Username already taken. Try another one.")
+
+if menu == "Login":
+    st.sidebar.subheader("Login to Your Account")
+    username = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
+    if st.sidebar.button("Login"):
+        if authenticate(username, password):
+            st.session_state["logged_in"] = True
+            st.session_state["username"] = username
+            st.sidebar.success("Login successful! Proceed to Expense Tracker.")
+        else:
+            st.sidebar.error("Invalid credentials. Try again.")
+
+if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
+    st.warning("Please log in to access SpendEase.")
+    st.stop()
 
 # Tagline
 st.sidebar.markdown("### 💰 SpendEase - Track, Save, Succeed!")
