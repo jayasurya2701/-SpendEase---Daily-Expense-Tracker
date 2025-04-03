@@ -13,7 +13,7 @@ from email.mime.multipart import MIMEMultipart
 
 st.set_page_config(page_title="SpendEase - Secure Expense Tracker", page_icon="💸")
 
-# Database Setup
+# Initialize Database
 def init_db():
     conn = sqlite3.connect("expenses.db")
     c = conn.cursor()
@@ -51,46 +51,33 @@ init_db()
 def load_auth_config():
     config_path = "config.yaml"
     if not os.path.exists(config_path):
-        default_config = {
-            "credentials": {
-                "usernames": {
-                    "admin": {
-                        "email": "admin@example.com",
-                        "name": "Admin",
-                        "password": "adminpassword"
-                    }
-                }
-            },
-            "cookie": {
-                "name": "spendease_cookie",
-                "key": "random_key",
-                "expiry_days": 30
-            }
-        }
-        with open(config_path, 'w') as file:
-            yaml.dump(default_config, file)
-
-    with open(config_path) as file:
+        st.error(f"Error: '{config_path}' not found. Please ensure the file exists.")
+        st.stop()
+    
+    with open(config_path, "r") as file:
         return yaml.load(file, Loader=SafeLoader)
 
-try:
-    auth_config = load_auth_config()
-except FileNotFoundError as e:
-    st.error(str(e))
-    st.stop()
+auth_config = load_auth_config()
 
-# Authentication
+# Debugging: Check if config is loaded properly
+st.write("Loaded Config:", auth_config)
+
+# Authentication Setup
 authenticator = stauth.Authenticate(
-    auth_config['credentials'],
-    auth_config['cookie']['name'],
-    auth_config['cookie']['key'],
-    auth_config['cookie']['expiry_days'],
+    auth_config.get('credentials', {}),
+    auth_config.get('cookie', {}).get('name', 'spendease_auth'),
+    auth_config.get('cookie', {}).get('key', 'random_secret_key'),
+    auth_config.get('cookie', {}).get('expiry_days', 30),
 )
 
-name, authentication_status, username = authenticator.login("Login", "sidebar")
+name, authentication_status, username = authenticator.login("Login", "main")  # Changed "sidebar" to "main"
 
-if not authentication_status:
+if authentication_status is False:
     st.warning("Please log in to access SpendEase.")
+    st.stop()
+
+if authentication_status is None:
+    st.error("Authentication failed. Please try again.")
     st.stop()
 
 st.sidebar.write(f"Logged in as: {username}")
@@ -115,13 +102,21 @@ st.session_state.monthly_budget = user_budget
 # Expense Entry
 st.title("💸 SpendEase - Daily Expense Tracker")
 st.subheader("Enter Your Expenses")
+
 category = st.selectbox("Expense Category", ["Food", "Transport", "Shopping", "Bills", "Others"])
 if category == "Others":
     category = st.text_input("Enter Custom Category")
 amount = st.number_input("Amount Spent", min_value=0.0, format="%.2f")
 date = st.date_input("Date", datetime.date.today()).strftime('%Y-%m-%d')
 time = st.time_input("Time", datetime.datetime.now().time()).strftime('%H:%M')
-period = "Morning" if 5 <= int(time.split(':')[0]) < 12 else "Afternoon" if int(time.split(':')[0]) < 17 else "Evening" if int(time.split(':')[0]) < 21 else "Night"
+
+hour = int(time.split(':')[0])
+period = (
+    "Morning" if 5 <= hour < 12 else
+    "Afternoon" if 12 <= hour < 17 else
+    "Evening" if 17 <= hour < 21 else
+    "Night"
+)
 
 if st.button("Add Expense"):
     cursor.execute("INSERT INTO expenses (user, date, time, period, category, amount) VALUES (?, ?, ?, ?, ?, ?)",
@@ -144,6 +139,7 @@ st.metric(label="Total Spent Today", value=f"₹{today_expenses['Amount'].sum():
 # Budget Setup
 st.sidebar.subheader("Set Budget Alert")
 new_budget = st.sidebar.number_input("Enter Monthly Budget", min_value=0.0, format="%.2f", value=user_budget)
+
 if st.sidebar.button("Save Budget"):
     cursor.execute("REPLACE INTO budgets (user, budget) VALUES (?, ?)", (username, new_budget))
     conn.commit()
@@ -152,23 +148,33 @@ if st.sidebar.button("Save Budget"):
 remaining_budget = new_budget - expenses['Amount'].sum()
 st.sidebar.subheader("Remaining Budget")
 st.sidebar.write(f"₹{remaining_budget:.2f}")
+
 if remaining_budget < 0:
     st.sidebar.warning("⚠️ You have exceeded your budget!")
     
     # Send Email Alert
     def send_email_alert(user_email, budget, total_spent):
-        sender_email = os.getenv("EMAIL_SENDER")
-        sender_password = os.getenv("EMAIL_PASSWORD")
+        sender_email = "your-email@gmail.com"
+        sender_password = "your-email-password"
         receiver_email = user_email
         subject = "Budget Alert - SpendEase"
-        body = f"Hello,\n\nYou have exceeded your budget of ₹{budget}. Your current total expenditure is ₹{total_spent}.\n\nPlease review your expenses.\n\nBest,\nSpendEase Team"
-        
+        body = f"""
+        Hello {username},
+
+        You have exceeded your budget of ₹{budget}. Your current total expenditure is ₹{total_spent}.
+
+        Please review your expenses.
+
+        Best,
+        SpendEase Team
+        """
+
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = receiver_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
-        
+
         try:
             server = smtplib.SMTP('smtp.gmail.com', 587)
             server.starttls()
@@ -179,9 +185,11 @@ if remaining_budget < 0:
         except Exception as e:
             st.error(f"Failed to send email: {e}")
 
+    # Get User Email & Send Alert
     cursor.execute("SELECT email FROM users WHERE username = ?", (username,))
-    user_email = cursor.fetchone()[0]
-    send_email_alert(user_email, new_budget, expenses['Amount'].sum())
+    user_email = cursor.fetchone()
+    if user_email:
+        send_email_alert(user_email[0], new_budget, expenses['Amount'].sum())
 
 # Close DB Connection
 conn.close()
