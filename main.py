@@ -4,9 +4,38 @@ import sqlite3
 import datetime
 import plotly.express as px
 
-# Set up Streamlit page
-st.set_page_config(page_title="SpendEase - Expense Tracker", page_icon="💸")
-st.sidebar.markdown("### 💰 SpendEase - Track, Save, Succeed!")
+# Set page configuration
+st.set_page_config(page_title="SpendEase - Daily Expense Tracker", layout="wide")
+
+# Custom CSS for alignment
+st.markdown(
+    """
+    <style>
+    .centered-text {
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        color: #1E88E5;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# Centered Header
+st.markdown("<p class='centered-text'>💸 SpendEase - Daily Expense Tracker - Track, Save, Succeed!</p>", unsafe_allow_html=True)
+
+# Sidebar for login/signup
+st.sidebar.header("🔑 Login / Sign Up")
+
+# Login/Signup selection
+auth_option = st.sidebar.radio("Select", ["Login", "Sign Up"])
+
+username = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
+
+if st.sidebar.button("Login"):
+    st.success(f"Welcome, {username}!")
 
 # Connect to SQLite Database
 conn = sqlite3.connect("spendease.db", check_same_thread=False)
