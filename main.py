@@ -48,11 +48,18 @@ init_db()
 
 # Load authentication config
 def load_auth_config():
-    with open("config.yaml") as file:
+    config_path = "config.yaml"
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Error: '{config_path}' not found. Please ensure the file exists.")
+    
+    with open(config_path) as file:
         return yaml.load(file, Loader=SafeLoader)
 
-auth_config = load_auth_config()
-
+try:
+    auth_config = load_auth_config()
+except FileNotFoundError as e:
+    st.error(str(e))
+    st.stop()
 # Authentication
 authenticator = stauth.Authenticate(
     auth_config['credentials'],
