@@ -87,7 +87,7 @@ authenticator = stauth.Authenticate(
     auth_config['cookie']['expiry_days'],
 )
 
-name, authentication_status, username = authenticator.login("Login", "main")
+name, authentication_status, username = authenticator.login("Login", "sidebar")
 
 if not authentication_status:
     st.warning("Please log in to access SpendEase.")
