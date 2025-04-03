@@ -14,10 +14,10 @@ st.markdown(
     .block-container { padding-top: 0rem !important; }
     .centered-text {
         text-align: center;
-        font-size: 28px;
+        font-size: 60px;
         font-weight: bold;
         color: #1E88E5;
-        margin-top: -50px;
+        margin-top: -100px;
     }
     </style>
     """,
