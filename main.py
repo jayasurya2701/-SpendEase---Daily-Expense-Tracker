@@ -1,156 +1,186 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
-import matplotlib.pyplot as plt
+import sqlite3
+import datetime
+import plotly.express as px
 
-# Database Connection
-conn = sqlite3.connect("expenses.db", check_same_thread=False)
+# Set page configuration
+st.set_page_config(page_title="SpendEase - Daily Expense Tracker", layout="wide")
+
+# Custom CSS to remove extra padding and center the header
+st.markdown(
+    """
+    <style>
+    .block-container { padding-top: 0rem !important; }
+    .centered-text {
+        text-align: center;
+        font-size: 28px;
+        font-weight: bold;
+        color: #1E88E5;
+        margin-top: -50px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# Centered Header
+st.markdown("<p class='centered-text'>💸 SpendEase - Daily Expense Tracker - Track, Save, Succeed!</p>", unsafe_allow_html=True)
+
+# Connect to SQLite Database
+conn = sqlite3.connect("spendease.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Ensure Tables Exist
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE,
-        password TEXT
-    )
-""")
+# Create Tables
+cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT
+)''')
 
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS expenses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        category TEXT,
-        amount REAL,
-        date TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )
-""")
+cursor.execute('''CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    date TEXT,
+    time TEXT,
+    period TEXT,
+    category TEXT,
+    amount REAL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+)''')
 
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS budgets (
-        user_id INTEGER PRIMARY KEY,
-        budget REAL,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )
-""")
+cursor.execute('''CREATE TABLE IF NOT EXISTS budgets (
+    user_id INTEGER PRIMARY KEY,
+    budget REAL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+)''')
+
 conn.commit()
 
-# Session State
+# User Authentication Functions
+def authenticate(username, password):
+    cursor.execute("SELECT id FROM users WHERE username=? AND password=?", (username, password))
+    user = cursor.fetchone()
+    return user[0] if user else None
+
+def register_user(username, password):
+    try:
+        cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+# Sidebar Authentication
 if "user_id" not in st.session_state:
-    st.session_state.user_id = None
-if "budget" not in st.session_state:
-    st.session_state.budget = None
+    st.sidebar.header("🔑 Login / Sign Up")
+    auth_option = st.sidebar.radio("Select", ["Login", "Sign Up"])
+    username = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
 
-# Title
-st.sidebar.title("💸 SpendEase - Daily Expense Tracker - Track, Save, Succeed!")
+    if auth_option == "Sign Up":
+        if st.sidebar.button("Register"):
+            if register_user(username, password):
+                st.sidebar.success("✅ Account Created! Please Login.")
+            else:
+                st.sidebar.error("❌ Username already exists. Try another.")
 
-# User Authentication
-menu = st.sidebar.radio("🔑 Login / Sign Up", ["Login", "Sign Up"])
+    if auth_option == "Login":
+        if st.sidebar.button("Login"):
+            user_id = authenticate(username, password)
+            if user_id:
+                st.session_state.user_id = user_id
+                st.session_state.username = username
+                st.sidebar.success(f"✅ Welcome {username}!")
+                st.rerun()
+            else:
+                st.sidebar.error("❌ Invalid Credentials!")
 
-if menu == "Sign Up":
-    st.subheader("Create an Account")
-    new_user = st.text_input("Username")
-    new_password = st.text_input("Password", type="password")
-    if st.button("Sign Up"):
-        try:
-            cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (new_user, new_password))
-            conn.commit()
-            st.success("Account created! Please login.")
-        except sqlite3.IntegrityError:
-            st.error("Username already exists. Try another one.")
+    st.stop()
 
-if menu == "Login":
-    st.subheader("Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    if st.button("Login"):
-        cursor.execute("SELECT id FROM users WHERE username = ? AND password = ?", (username, password))
-        user = cursor.fetchone()
-        if user:
-            st.session_state.user_id = user[0]
-            st.success(f"Welcome, {username}!")
-        else:
-            st.error("Invalid credentials.")
+# Get logged-in user ID
+user_id = st.session_state.user_id
 
-# Ensure User is Logged In
-if st.session_state.user_id:
-    user_id = st.session_state.user_id
+# Expense Entry Section
+st.subheader("📌 Enter Your Expenses")
+category = st.selectbox("Expense Category", ["Food", "Transport", "Shopping", "Bills", "Others"])
+if category == "Others":
+    category = st.text_input("Enter Custom Category")
+amount = st.number_input("Amount Spent", min_value=0.0, format="%.2f")
+date = st.date_input("Date", datetime.date.today())
+time = st.time_input("Time", datetime.datetime.now().time()).strftime("%I:%M %p")
 
-    # Budget Tracking
-    st.subheader("💰 Set Your Monthly Budget")
-    cursor.execute("SELECT budget FROM budgets WHERE user_id = ?", (user_id,))
-    budget_row = cursor.fetchone()
-    current_budget = budget_row[0] if budget_row else 0
-    new_budget = st.number_input("Set Monthly Budget", value=current_budget)
+# Determine Time Period
+hour = datetime.datetime.strptime(time, "%I:%M %p").hour
+period = "Morning" if 5 <= hour < 12 else "Afternoon" if 12 <= hour < 17 else "Evening" if 17 <= hour < 21 else "Night"
+
+if st.button("Add Expense"):
+    cursor.execute("INSERT INTO expenses (user_id, date, time, period, category, amount) VALUES (?, ?, ?, ?, ?, ?)",
+                   (user_id, date, time, period, category, amount))
+    conn.commit()
+    st.success("✅ Expense Added!")
+    st.rerun()
+
+# Load Expenses for Logged-in User
+expenses = pd.read_sql("SELECT * FROM expenses WHERE user_id=?", conn, params=(user_id,))
+expenses["date"] = pd.to_datetime(expenses["date"], errors='coerce')
+
+# Display Daily Total
+today = datetime.date.today()
+today_expenses = expenses[expenses['date'].dt.date == today]
+st.subheader("📊 Today's Total Expense")
+st.metric(label="Total Spent Today", value=f"₹{today_expenses['amount'].sum():.2f}")
+
+# Weekly & Monthly Summary
+st.sidebar.header("📈 Expense Summary")
+weekly_expenses = expenses[expenses["date"] >= pd.to_datetime(today - datetime.timedelta(days=7))]
+monthly_expenses = expenses[expenses["date"].dt.month == today.month]
+
+st.sidebar.subheader("📆 Weekly Total")
+st.sidebar.write(f"₹{weekly_expenses['amount'].sum():.2f}")
+
+st.sidebar.subheader("📅 Monthly Total")
+st.sidebar.write(f"₹{monthly_expenses['amount'].sum():.2f}")
+
+# Budget Setting & Alerts
+st.sidebar.subheader("💰 Set Monthly Budget")
+cursor.execute("SELECT budget FROM budgets WHERE user_id=?", (user_id,))
+budget_data = cursor.fetchone()
+current_budget = budget_data[0] if budget_data else 0.0
+new_budget = st.sidebar.number_input("Enter Budget", min_value=0.0, format="%.2f", value=current_budget)
+
+if st.sidebar.button("Save Budget"):
+    cursor.execute("REPLACE INTO budgets (user_id, budget) VALUES (?, ?)", (user_id, new_budget))
+    conn.commit()
+    st.sidebar.success("✅ Budget Updated!")
+    st.rerun()
+
+remaining_budget = new_budget - monthly_expenses['amount'].sum()
+st.sidebar.subheader("📉 Remaining Budget")
+st.sidebar.write(f"₹{remaining_budget:.2f}")
+
+if remaining_budget < 0:
+    st.sidebar.warning("⚠️ You have exceeded your budget!")
+
+# Expense Deletion
+st.subheader("🗑️ Manage Expenses")
+if not expenses.empty:
+    expense_to_delete = st.selectbox("Select an expense to delete", expenses["id"])
+    if st.button("Delete Selected Expense"):
+        cursor.execute("DELETE FROM expenses WHERE id=? AND user_id=?", (expense_to_delete, user_id))
+        conn.commit()
+        st.success("✅ Expense Deleted!")
+        st.rerun()
+
+# Expense Visualization
+st.subheader("📊 Expense Analytics")
+if not expenses.empty:
+    category_summary = expenses.groupby('category')['amount'].sum().reset_index()
+    fig = px.pie(category_summary, names='category', values='amount', title='Expense Distribution')
+    st.plotly_chart(fig)
     
-    if st.button("Update Budget"):
-        if budget_row:
-            cursor.execute("UPDATE budgets SET budget = ? WHERE user_id = ?", (new_budget, user_id))
-        else:
-            cursor.execute("INSERT INTO budgets (user_id, budget) VALUES (?, ?)", (user_id, new_budget))
-        conn.commit()
-        st.session_state.budget = new_budget
-        st.success("Budget updated!")
+    trend_fig = px.bar(expenses, x='date', y='amount', color='category', title='Daily Expense Trends')
+    st.plotly_chart(trend_fig)
 
-    # Add Expense
-    st.subheader("📝 Add Expense")
-    category = st.selectbox("Category", ["Food", "Transport", "Shopping", "Bills", "Entertainment", "Other"])
-    amount = st.number_input("Amount", min_value=0.0, format="%.2f")
-    date = st.date_input("Date")
-
-    if st.button("Add Expense"):
-        cursor.execute("INSERT INTO expenses (user_id, category, amount, date) VALUES (?, ?, ?, ?)",
-                       (user_id, category, amount, date))
-        conn.commit()
-        st.success("Expense added!")
-
-    # Show Expenses
-    st.subheader("📜 Your Expenses")
-    cursor.execute("SELECT id, category, amount, date FROM expenses WHERE user_id = ?", (user_id,))
-    expenses = cursor.fetchall()
-    
-    if expenses:
-        df = pd.DataFrame(expenses, columns=["ID", "Category", "Amount", "Date"])
-        st.dataframe(df)
-
-        # Budget Alert
-        total_spent = df["Amount"].sum()
-        if st.session_state.budget and total_spent > st.session_state.budget:
-            st.warning("⚠️ You have exceeded your budget!")
-
-        # Graphical Reports
-        st.subheader("📊 Expense Insights")
-        fig, ax = plt.subplots(1, 2, figsize=(12, 5))
-
-        # Pie Chart
-        category_totals = df.groupby("Category")["Amount"].sum()
-        ax[0].pie(category_totals, labels=category_totals.index, autopct="%1.1f%%", startangle=90)
-        ax[0].set_title("Expense Distribution")
-
-        # Bar Chart
-        df["Date"] = pd.to_datetime(df["Date"])
-        date_totals = df.groupby("Date")["Amount"].sum()
-        ax[1].bar(date_totals.index, date_totals.values)
-        ax[1].set_title("Daily Spending")
-        ax[1].tick_params(axis="x", rotation=45)
-
-        st.pyplot(fig)
-
-        # Export Data
-        st.subheader("📤 Export Data")
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button("Download CSV", data=csv, file_name="expenses.csv", mime="text/csv")
-    else:
-        st.info("No expenses found.")
-
-    # Delete Expenses
-    st.subheader("🗑️ Delete Expense")
-    expense_id = st.number_input("Enter Expense ID to Delete", min_value=1, step=1)
-    if st.button("Delete Expense"):
-        cursor.execute("DELETE FROM expenses WHERE id = ? AND user_id = ?", (expense_id, user_id))
-        conn.commit()
-        st.success("Expense deleted!")
-
-else:
-    st.warning("Please login to manage your expenses.")
+# Logout Button
+st.sidebar.button("🔒 Logout", on_click=lambda: st.session_state.clear() or st.rerun())
